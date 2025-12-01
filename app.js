@@ -2,166 +2,79 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
-// Define a porta de escuta. Prioriza a variável de ambiente (process.env.PORT) 
-// fornecida pela hospedagem (Squareweb) ou usa 80 como padrão.
 const PORT = process.env.PORT || 80;
+const { BITRIX_WEBHOOK } = process.env;
 
-// O webhook do Bitrix24 deve ser configurado como uma variável de ambiente (BITRIX_WEBHOOK).
-const BITRIX_WEBHOOK = process.env.BITRIX_WEBHOOK;
+// Função utilitária compacta para erros
+const categorizarErro = (num) => 
+    num.length < 11 ? "Poucos caracteres (< 11)." :
+    num.length >= 14 ? "Muitos caracteres (> 13)." :
+    "Comprimento inválido (fora do padrão BR).";
 
-/**
- * Categoriza o tipo de erro de comprimento do número de telefone.
- * @param {string} numeroLimpo - O número de telefone apenas com dígitos.
- * @returns {string} Descrição do erro.
- */
-function categorizarErro(numeroLimpo) {
-    if (numeroLimpo.length < 11) {
-        return "Número com poucos caracteres (menos de 11 dígitos, ex: DDI+DDD+7 dígitos).";
-    }
-    if (numeroLimpo.length >= 14) {
-        return "Número com muitos caracteres (mais de 13 dígitos).";
-    }
-    return "Número Incompleto ou Inválido (Comprimento incorreto para o padrão BR).";
-}
-
-/**
- * Padroniza o número de telefone para o formato DDI + DDD + Telefone (13 dígitos).
- * @param {string} input - O número de telefone bruto, que pode incluir prefixos, vírgulas, etc.
- * @returns {{sucesso: boolean, valor: string}} Objeto com o status e o valor (padronizado ou mensagem de erro).
- */
-function padronizarTelefoneBrasil(input) {
-    const DDI_BRASIL = '55';
-    // Pega apenas o primeiro segmento caso haja múltiplos números separados por vírgula
-    let numeroSegmento = input.split(',')[0].trim();
+// Função principal de padronização
+const padronizarTelefoneBrasil = (input) => {
+    const DDI = '55';
+    // Remove caracteres não numéricos e espaços do primeiro número
+    const num = input.split(',')[0].trim().replace(/\D/g, '');
     
-    // Remove todos os caracteres não numéricos
-    let numeroLimpo = numeroSegmento.replace(/\D/g, '');
+    console.log(`[PADRONIZADOR] Analisando: ${num}`);
 
-    const COMPRIMENTO_IDEAL = 13; // Ex: 55 + 11 + 987654321
-
-    console.log(`[PADRONIZADOR] Número limpo para análise: ${numeroLimpo}`);
-
-    // Verifica se o comprimento está fora do padrão (assumindo DDI+DDD+9 dígitos)
-    if (numeroLimpo.length !== COMPRIMENTO_IDEAL && 
-        !(numeroLimpo.length === 11 && !numeroLimpo.startsWith(DDI_BRASIL))) {
-        
-        console.log(`[PADRONIZADOR] FALHA: Comprimento inválido (${numeroLimpo.length} dígitos).`);
-        return { 
-            sucesso: false, 
-            valor: categorizarErro(numeroLimpo) 
-        };
+    // Validação de comprimento: aceita 13 dígitos OU (11 dígitos se não começar com 55)
+    if (num.length !== 13 && !(num.length === 11 && !num.startsWith(DDI))) {
+        console.log(`[PADRONIZADOR] Falha: ${num.length} dígitos.`);
+        return { sucesso: false, valor: categorizarErro(num) };
     }
 
-    // Se já começar com o DDI (55), retorna como está
-    if (numeroLimpo.startsWith(DDI_BRASIL)) {
-        console.log(`[PADRONIZADOR] SUCESSO: Já padronizado com DDI.`);
-        return { sucesso: true, valor: numeroLimpo };
-    } 
-    
-    // Se tiver 11 dígitos (DDD + 9 dígitos), adiciona o DDI
-    if (numeroLimpo.length === 11) {
-        const valorPadronizado = DDI_BRASIL + numeroLimpo;
-        console.log(`[PADRONIZADOR] SUCESSO: Adicionado DDI. Resultado: ${valorPadronizado}`);
-        return { sucesso: true, valor: valorPadronizado };
-    }
-    
-    console.log(`[PADRONIZADOR] FALHA: Erro desconhecido na lógica final.`);
-    return { 
-        sucesso: false, 
-        valor: "Erro desconhecido na padronização." 
-    };
-}
+    // Retorna número se já tiver DDI ou adiciona DDI se tiver 11 dígitos
+    const valor = num.startsWith(DDI) ? num : (num.length === 11 ? DDI + num : null);
 
-/**
- * Envia o valor padronizado ou a mensagem de erro para o campo customizado no Bitrix24.
- * Também envia o valor fixo '2872' para o campo UF_CRM_1761808180550.
- * @param {string} leadId - ID do Lead a ser atualizado.
- * @param {string} valor - Valor padronizado ou mensagem de erro.
- */
-async function enviarParaBitrix24(leadId, valor) {
-    if (!BITRIX_WEBHOOK) {
-        console.error("ERRO CRÍTICO: BITRIX_WEBHOOK não está configurado nas variáveis de ambiente. Não é possível enviar dados.");
-        return;
+    if (valor) {
+        console.log(`[PADRONIZADOR] Sucesso: ${valor}`);
+        return { sucesso: true, valor };
     }
 
-    const apiMethod = 'crm.lead.update';
-    // O endpoint completo inclui o método da API
-    const endpoint = BITRIX_WEBHOOK + apiMethod;
+    console.log(`[PADRONIZADOR] Erro lógico desconhecido.`);
+    return { sucesso: false, valor: "Erro desconhecido." };
+};
 
-    // A API do Bitrix espera 'fields' e 'id' diretamente no payload
-    const dadosPayload = {
-        id: leadId,
-        fields: {
-            // 1. Campo de telefone (valor processado)
-            'UF_CRM_1761804215': valor,
-            // 2. CAMPO FIXO REQUISITADO: Atualiza para o valor '2872'
-            'UF_CRM_1761808180550': '2872' 
-        }
+// Integração com Bitrix24
+const enviarParaBitrix24 = async (id, valor) => {
+    if (!BITRIX_WEBHOOK) return console.error("[BITRIX] CRÍTICO: Webhook não configurado.");
+
+    const payload = { 
+        id, 
+        fields: { 'UF_CRM_1761804215': valor, 'UF_CRM_1761808180550': '2872' } 
     };
 
-    console.log(`[BITRIX-REQ] Tentando atualizar Lead ${leadId}. Novo valor Telefone: ${valor} | Campo Fixo: 2872`);
-    console.log(`[BITRIX-REQ] Payload enviado: ${JSON.stringify(dadosPayload)}`);
+    console.log(`[BITRIX] Atualizando Lead ${id}. Payload: ${JSON.stringify(payload)}`);
 
     try {
-        const response = await axios.post(endpoint, dadosPayload);
-        
-        if (response.data.result) {
-            console.log(`[BITRIX-SUCESSO] Lead ${leadId} atualizado com sucesso. Status HTTP: ${response.status}`);
-        } else {
-            // Loga o erro específico retornado pela API do Bitrix
-            console.error(`[BITRIX-ERRO] Falha na API do Bitrix24. Lead ${leadId}. Descrição: ${response.data.error_description || 'Erro desconhecido'}`);
-        }
-    } catch (error) {
-        // Loga erros de conexão ou de rede
-        console.error(`[BITRIX-ERRO] Erro de rede/conexão ao enviar para o Bitrix24. Detalhe:`, error.message);
+        const { data, status } = await axios.post(`${BITRIX_WEBHOOK}crm.lead.update`, payload);
+        if (data.result) console.log(`[BITRIX] Sucesso (HTTP ${status}).`);
+        else console.error(`[BITRIX] Erro API: ${data.error_description}`);
+    } catch (e) {
+        console.error(`[BITRIX] Erro Rede: ${e.message}`);
     }
-}
+};
 
-// ----------------------------------------------------------------------
-// Rota Principal do Webhook (Endpoint GET)
-// ----------------------------------------------------------------------
+// Rota Principal
 app.get('/', async (req, res) => {
-    // Captura o parâmetro de telefone usando 'telefoneInput' (conforme URL do Bitrix)
-    const telefoneInput = req.query.telefoneInput;
-    const leadId = req.query.leadId;
+    const { telefoneInput: tel, leadId } = req.query;
 
-    // Log de rastreamento de início da requisição
-    console.log(`\n--- REQUISIÇÃO RECEBIDA: ${new Date().toISOString()} ---`);
-    console.log(`[INPUT] Telefone (telefoneInput): ${telefoneInput}`); 
-    console.log(`[INPUT] ID do Lead (leadId): ${leadId}`);
+    console.log(`\n[REQ] ${new Date().toISOString()} | Tel: ${tel} | Lead: ${leadId}`);
 
-
-    // Validação de inputs obrigatórios
-    if (!telefoneInput || !leadId) {
-        const mensagem = "Erro: Parâmetros 'telefoneInput' (telefone) ou 'leadId' faltando.";
-        console.error(`[ERRO-400] ${mensagem}`);
-        return res.status(400).send(`<h1>${mensagem}</h1>`);
+    if (!tel || !leadId) {
+        console.error("[ERRO] Parâmetros 'telefoneInput' ou 'leadId' faltando.");
+        return res.status(400).send("<h1>Erro: Parâmetros faltando.</h1>");
     }
 
-    // 1. Processamento do telefone
-    const resultado = padronizarTelefoneBrasil(telefoneInput);
+    const { sucesso, valor } = padronizarTelefoneBrasil(tel);
+    
+    // Envia para o Bitrix de forma assíncrona (await garante a ordem)
+    await enviarParaBitrix24(leadId, valor);
 
-    // 2. Envio dos valores para o Bitrix24 (Incluindo o campo fixo)
-    await enviarParaBitrix24(leadId, resultado.valor);
-
-    // 3. Resposta final para o serviço que chamou o webhook
-    res.json({
-        processamento_sucesso: resultado.sucesso,
-        valor_enviado_bitrix: resultado.valor,
-        lead_id_atualizado: leadId,
-        campo_fixo_atualizado: 'UF_CRM_1761808180550 = 2872'
-    });
-    console.log(`--- REQUISIÇÃO FINALIZADA. Status: 200 ---`);
+    res.json({ sucesso, valor, leadId, fixo: '2872' });
+    console.log("[REQ] Finalizada (200).");
 });
 
-
-// ----------------------------------------------------------------------
-// Inicialização do Servidor
-// ----------------------------------------------------------------------
-app.listen(PORT, () => {
-    console.log(`\n======================================================`);
-    console.log(`Servidor de Webhook (Bitrix Padronizador) INICIADO.`);
-    console.log(`Porta de escuta: ${PORT}`);
-    console.log('Versão: v1.0.6 (Adição de campo fixo UF_CRM_1761808180550)');
-    console.log('======================================================\n');
-});
+app.listen(PORT, () => console.log(`Servidor Webhook rodando na porta ${PORT} (vCompacta).`));
