@@ -123,8 +123,8 @@ app.get('/', async (req, res) => {
 
     // Log de rastreamento de início da requisição
     console.log(`\n--- REQUISIÇÃO RECEBIDA: ${new Date().toISOString()} ---`);
-    console.log(`[INPUT] Telefone (id): ${telefoneInput}`);
     console.log(`[INPUT] ID do Lead (leadId): ${leadId}`);
+    console.log(`[INPUT] Telefone: ${telefoneInput}`);
 
 
     // Validação de inputs obrigatórios
