@@ -2,6 +2,7 @@
 
 -------------------------
    PADRONIZADOR DE TELEFONES E REGISTRO DE LOGS
+
 -------------------------
 
 Descricao
@@ -33,6 +34,7 @@ Estrutura de Arquivos
 
 -------------------------
    GUIA DE INSTALACAO E USO
+
 -------------------------
 
 1. Pre-requisitos
@@ -68,5 +70,6 @@ Abra o arquivo 'conexao.js' e edite as credenciais de acesso ao banco:
 Para iniciar o processamento e salvar os logs, execute:
 
    node app.js
+   
 -------------------------
 
