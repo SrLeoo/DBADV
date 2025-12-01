@@ -1,9 +1,7 @@
 # DBADV
 
--------------------------
 # PADRONIZADOR DE TELEFONES E REGISTRO DE LOGS
 
--------------------------
 
 Descricao
 ---------
@@ -32,10 +30,9 @@ Estrutura de Arquivos
 |-- package.json      # Dependencias do projeto
 |-- .gitignore        # Arquivos ignorados pelo Git
 
--------------------------
+
 # GUIA DE INSTALACAO E USO
 
--------------------------
 
 1. Pre-requisitos
 -----------------
