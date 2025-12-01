@@ -91,7 +91,8 @@ async function enviarParaBitrix24(leadId, valor) {
     const dadosPayload = {
         id: leadId,
         fields: {
-            'UF_CRM_1761804215': valor // Campo customizado para o novo valor
+            // Envolve o valor em um array, conforme é comum para campos customizados
+            'UF_CRM_1761804215': [valor] 
         }
     };
 
@@ -117,19 +118,19 @@ async function enviarParaBitrix24(leadId, valor) {
 // Rota Principal do Webhook (Endpoint GET)
 // ----------------------------------------------------------------------
 app.get('/', async (req, res) => {
-    // Captura os parâmetros da URL (Query String: ?id=...&leadId=...)
-    const telefoneInput = req.query.id;
+    // CORREÇÃO: Captura o parâmetro de telefone usando 'telefoneInput' (conforme URL do Bitrix)
+    const telefoneInput = req.query.telefoneInput;
     const leadId = req.query.leadId;
 
     // Log de rastreamento de início da requisição
     console.log(`\n--- REQUISIÇÃO RECEBIDA: ${new Date().toISOString()} ---`);
+    console.log(`[INPUT] Telefone (telefoneInput): ${telefoneInput}`); // Log atualizado
     console.log(`[INPUT] ID do Lead (leadId): ${leadId}`);
-    console.log(`[INPUT] Telefone: ${telefoneInput}`);
 
 
-    // Validação de inputs obrigatórios
+    // Validação de inputs obrigatórios (agora verificando telefoneInput)
     if (!telefoneInput || !leadId) {
-        const mensagem = "Erro: Parâmetros 'id' (telefone) ou 'leadId' faltando.";
+        const mensagem = "Erro: Parâmetros 'telefoneInput' (telefone) ou 'leadId' faltando.";
         console.error(`[ERRO-400] ${mensagem}`);
         return res.status(400).send(`<h1>${mensagem}</h1>`);
     }
@@ -157,6 +158,6 @@ app.listen(PORT, () => {
     console.log(`\n======================================================`);
     console.log(`Servidor de Webhook (Bitrix Padronizador) INICIADO.`);
     console.log(`Porta de escuta: ${PORT}`);
-    console.log('Versão: v1.0.2 (Logs e Correção de Payload Bitrix)');
+    console.log('Versão: v1.0.4 (Correção de nome de parâmetro: telefoneInput)');
     console.log('======================================================\n');
 });
