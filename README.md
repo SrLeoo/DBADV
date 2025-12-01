@@ -1,7 +1,7 @@
 # DBADV
 
 -------------------------
-   PADRONIZADOR DE TELEFONES E REGISTRO DE LOGS
+# PADRONIZADOR DE TELEFONES E REGISTRO DE LOGS
 
 -------------------------
 
@@ -33,7 +33,7 @@ Estrutura de Arquivos
 |-- .gitignore        # Arquivos ignorados pelo Git
 
 -------------------------
-   GUIA DE INSTALACAO E USO
+# GUIA DE INSTALACAO E USO
 
 -------------------------
 
@@ -70,6 +70,4 @@ Abra o arquivo 'conexao.js' e edite as credenciais de acesso ao banco:
 Para iniciar o processamento e salvar os logs, execute:
 
    node app.js
-   
--------------------------
 
