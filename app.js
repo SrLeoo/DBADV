@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 80;
 
 /**
 
@@ -11,7 +11,6 @@ const PORT = process.env.PORT || 3000;
 function padronizarTelefoneBrasil(input) {
 
     const DDI_BRASIL = '55';
-    
 
     let numeroLimpo = input.replace(/\D/g, '');
     
@@ -30,19 +29,24 @@ function padronizarTelefoneBrasil(input) {
 
 app.get('/', (req, res) => {
 
-    const telefoneInput = req.query.id; 
+    const idInput = req.query.id;
+    const telefoneInput = req.query.telefone
 
     if (!telefoneInput) {
 
-        const mensagem = "Erro: Parâmetro 'id' faltando. Use o formato: /?id=<seu_telefone>";
         console.log(`[ERRO] ${mensagem}`);
         return res.status(400).send(`<h1>${mensagem}</h1>`);
     }
 
+
+
+
+
     const telefonePadronizado = padronizarTelefoneBrasil(telefoneInput);
 
 
-    console.log(`[SUCESSO] Input Recebido: ${telefoneInput}`);
+    // console.log(`[SUCESSO] Input Recebido: ${telefoneInput}`);
+    console.log(`[LOG TERMINAL] ID: ${idInput}`)
     console.log(`[LOG TERMINAL] Output Padronizado: ${telefonePadronizado}`);
 
     res.json({
@@ -53,6 +57,5 @@ app.get('/', (req, res) => {
 
 
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-    console.log(`Acesse: http://localhost:${PORT}/?id=199961463213814`);
+    console.log(`Acesse: https://dbadv-correcaotelefone.squareweb.app/(parametro)`);
 });
