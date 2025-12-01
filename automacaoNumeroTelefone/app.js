@@ -1,4 +1,4 @@
-const telefoneInput = ""; 
+const telefoneInput = "199961463213814"; 
 
 function padronizarTelefoneBrasil(input) {
     const DDI_BRASIL = '55';
