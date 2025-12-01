@@ -92,7 +92,7 @@ async function enviarParaBitrix24(leadId, valor) {
         id: leadId,
         fields: {
             // Envolve o valor em um array, conforme é comum para campos customizados
-            'UF_CRM_1761804215': [valor] 
+            'UF_CRM_1761804215': valor
         }
     };
 
