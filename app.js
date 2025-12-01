@@ -74,6 +74,7 @@ function padronizarTelefoneBrasil(input) {
 
 /**
  * Envia o valor padronizado ou a mensagem de erro para o campo customizado no Bitrix24.
+ * Também envia o valor fixo '2872' para o campo UF_CRM_1761808180550.
  * @param {string} leadId - ID do Lead a ser atualizado.
  * @param {string} valor - Valor padronizado ou mensagem de erro.
  */
@@ -91,12 +92,14 @@ async function enviarParaBitrix24(leadId, valor) {
     const dadosPayload = {
         id: leadId,
         fields: {
-            // Envolve o valor em um array, conforme é comum para campos customizados
-            'UF_CRM_1761804215': valor
+            // 1. Campo de telefone (valor processado)
+            'UF_CRM_1761804215': valor,
+            // 2. CAMPO FIXO REQUISITADO: Atualiza para o valor '2872'
+            'UF_CRM_1761808180550': '2872' 
         }
     };
 
-    console.log(`[BITRIX-REQ] Tentando atualizar Lead ${leadId}. Novo valor: ${valor}`);
+    console.log(`[BITRIX-REQ] Tentando atualizar Lead ${leadId}. Novo valor Telefone: ${valor} | Campo Fixo: 2872`);
     console.log(`[BITRIX-REQ] Payload enviado: ${JSON.stringify(dadosPayload)}`);
 
     try {
@@ -118,17 +121,17 @@ async function enviarParaBitrix24(leadId, valor) {
 // Rota Principal do Webhook (Endpoint GET)
 // ----------------------------------------------------------------------
 app.get('/', async (req, res) => {
-    // CORREÇÃO: Captura o parâmetro de telefone usando 'telefoneInput' (conforme URL do Bitrix)
+    // Captura o parâmetro de telefone usando 'telefoneInput' (conforme URL do Bitrix)
     const telefoneInput = req.query.telefoneInput;
     const leadId = req.query.leadId;
 
     // Log de rastreamento de início da requisição
     console.log(`\n--- REQUISIÇÃO RECEBIDA: ${new Date().toISOString()} ---`);
-    console.log(`[INPUT] Telefone (telefoneInput): ${telefoneInput}`); // Log atualizado
+    console.log(`[INPUT] Telefone (telefoneInput): ${telefoneInput}`); 
     console.log(`[INPUT] ID do Lead (leadId): ${leadId}`);
 
 
-    // Validação de inputs obrigatórios (agora verificando telefoneInput)
+    // Validação de inputs obrigatórios
     if (!telefoneInput || !leadId) {
         const mensagem = "Erro: Parâmetros 'telefoneInput' (telefone) ou 'leadId' faltando.";
         console.error(`[ERRO-400] ${mensagem}`);
@@ -138,14 +141,15 @@ app.get('/', async (req, res) => {
     // 1. Processamento do telefone
     const resultado = padronizarTelefoneBrasil(telefoneInput);
 
-    // 2. Envio do valor para o Bitrix24 (Mesmo que seja uma mensagem de erro)
+    // 2. Envio dos valores para o Bitrix24 (Incluindo o campo fixo)
     await enviarParaBitrix24(leadId, resultado.valor);
 
     // 3. Resposta final para o serviço que chamou o webhook
     res.json({
         processamento_sucesso: resultado.sucesso,
         valor_enviado_bitrix: resultado.valor,
-        lead_id_atualizado: leadId
+        lead_id_atualizado: leadId,
+        campo_fixo_atualizado: 'UF_CRM_1761808180550 = 2872'
     });
     console.log(`--- REQUISIÇÃO FINALIZADA. Status: 200 ---`);
 });
@@ -158,6 +162,6 @@ app.listen(PORT, () => {
     console.log(`\n======================================================`);
     console.log(`Servidor de Webhook (Bitrix Padronizador) INICIADO.`);
     console.log(`Porta de escuta: ${PORT}`);
-    console.log('Versão: v1.0.4 (Correção de nome de parâmetro: telefoneInput)');
+    console.log('Versão: v1.0.6 (Adição de campo fixo UF_CRM_1761808180550)');
     console.log('======================================================\n');
 });
