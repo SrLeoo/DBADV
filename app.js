@@ -45,7 +45,7 @@ app.get('/', (req, res) => {
     const telefonePadronizado = padronizarTelefoneBrasil(telefoneInput);
 
 
-    // console.log(`[SUCESSO] Input Recebido: ${telefoneInput}`);
+    console.log(`[SUCESSO] Input Recebido: ${telefoneInput}`);
     console.log(`[LOG TERMINAL] ID: ${idInput}`)
     console.log(`[LOG TERMINAL] Output Padronizado: ${telefonePadronizado}`);
 
