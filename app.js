@@ -67,17 +67,31 @@ async function atualizarBitrix(leadId, resultado) {
     const payload = {
         id: leadId,
         fields: {
-            [CAMPO_TELEFONE_ID]: resultado.sucesso ? resultado.valor : '',
+            // Se sucesso for false, envia string vazia para o telefone e o status de falha
+            [CAMPO_TELEFONE_ID]: resultado.sucesso ? resultado.valor : '', 
             [CAMPO_FIXO_ID]: resultado.sucesso ? STATUS_BITRIX_SUCESSO : STATUS_BITRIX_FALHA
         }
     };
 
     try {
         const { data } = await axios.post(`${BITRIX_WEBHOOK}crm.lead.update`, payload);
-        if (!data.result)
-            console.error("[BITRIX] Erro API:", data.error_description);
+        
+        if (!data.result) {
+            // Log detalhado de erro retornado pela API do Bitrix
+            console.error("[BITRIX] Erro API: Falha ao atualizar lead. Descrição:", 
+                          data.error_description, 
+                          "Payload enviado:", 
+                          JSON.stringify(payload));
+        } else {
+            // Log de sucesso
+            console.log(`[BITRIX SUCESSO] Lead ID ${leadId} atualizado para status: ${payload.fields[CAMPO_FIXO_ID]}`);
+        }
     } catch (e) {
-        console.error("[BITRIX] Erro de rede:", e.message);
+        // Log detalhado de erro de rede/conexão
+        console.error("[BITRIX] Erro de rede/conexão ao atualizar lead:", 
+                      e.message, 
+                      "Payload enviado:", 
+                      JSON.stringify(payload));
     }
 }
 
@@ -171,7 +185,7 @@ app.post('/webhook-bitrix', async (req, res) => {
     try {
         const resultado = padronizarTelefoneBrasil(telefone);
 
-        // 1. Atualiza o Bitrix (Adicionado: Estava faltando na rota POST)
+        // 1. Atualiza o Bitrix 
         if (leadId && leadId !== 'N/A') {
              await atualizarBitrix(leadId, resultado);
         }
@@ -187,7 +201,7 @@ app.post('/webhook-bitrix', async (req, res) => {
         // Resultado de erro específico para erro interno no servidor
         const resultadoErro = { sucesso: false, valor: `Erro interno: ${erro.message}`, statusDetail: "Erro interno do servidor", inputOriginal: telefone };
 
-        // 1. Atualiza o Bitrix (Adicionado: Atualiza para falha em caso de erro interno)
+        // 1. Atualiza o Bitrix (Em caso de erro interno, registra a falha no Bitrix)
         if (leadId && leadId !== 'N/A') {
              await atualizarBitrix(leadId, resultadoErro);
         }
