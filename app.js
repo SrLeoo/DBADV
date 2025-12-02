@@ -13,9 +13,7 @@ const { BITRIX_WEBHOOK } = process.env;
 const STATUS_BITRIX_SUCESSO = '2872'; // ID do status de sucesso no Bitrix
 const STATUS_BITRIX_FALHA = '3026';   // ID do status de falha no Bitrix
 const CAMPO_FIXO_ID = 'UF_CRM_1761808180550';
-// ATENÇÃO: Se o campo CAMPO_TELEFONE_ID for um campo de telefone nativo do Bitrix, 
-// o ID do campo deveria ser "PHONE". Como está como UF_CRM_...,  
-// presumimos que é um campo customizado do tipo string/texto.
+// ID do campo customizado de telefone
 const CAMPO_TELEFONE_ID = 'UF_CRM_1761804215'; 
 const EMPRESA_FIXA = "Dutra Bitencourt Advocacia"; // Cliente mockado
 
@@ -69,18 +67,12 @@ async function atualizarBitrix(leadId, resultado) {
         [CAMPO_FIXO_ID]: statusValue 
     };
 
-    // ** Lógica de Correção para Campos Multivalorados (Telefone) **
+    // ** Lógica Corrigida: Assume que UF_CRM_... é um campo customizado do tipo TEXTO (STRING) **
     if (resultado.sucesso) {
-        // Se o resultado foi SUCESSO, atualiza o campo de telefone.
-        // O valor é encapsulado em um array de objetos, formato padrão para Bitrix API.
-        camposParaAtualizar[CAMPO_TELEFONE_ID] = [
-            { "VALUE": resultado.valor, "VALUE_TYPE": "WORK" } // 'WORK' é um VALUE_TYPE comum
-        ];
+        // Envia o telefone padronizado como STRING simples.
+        camposParaAtualizar[CAMPO_TELEFONE_ID] = resultado.valor;
     } else {
-        // Se FALHA, garante que o campo de telefone seja limpo ou atualizado para "" (string vazia).
-        // Se CAMPO_TELEFONE_ID for um campo string customizado, "" funciona.
-        // Se for um campo PHONE nativo que espera array, enviar null ou [] pode ser melhor, 
-        // mas vamos manter "" como string, pois é um UF_CRM.
+        // Se FALHA, limpa o campo com STRING vazia.
         camposParaAtualizar[CAMPO_TELEFONE_ID] = '';
     }
 
@@ -97,12 +89,13 @@ async function atualizarBitrix(leadId, resultado) {
                           data.error_description, 
                           "Payload enviado:", 
                           JSON.stringify(payload));
+            
             // Logamos a falha de padronização, mas o Bitrix está retornando ERRO. 
             // Para efeitos de auditoria, vamos logar este erro de Bitrix.
              await registrarLogAuditoria(
-                EMPRESA_FIXA, // Use a constante fixa
+                EMPRESA_FIXA, 
                 "Bitrix Update Falhou", 
-                { sucesso: false, valor: data.error_description || "Erro API Desconhecido", statusDetail: "Falha na API do Bitrix", inputOriginal: resultado.inputOriginal }, 
+                { sucesso: false, valor: data.error_description || "Erro API Desconhecido", statusDetail: `Falha na API do Bitrix: ${data.error_description || 'Erro desconhecido'}`, inputOriginal: resultado.inputOriginal }, 
                 leadId
             );
         } else {
