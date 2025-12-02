@@ -6,8 +6,8 @@ const PORT = process.env.PORT || 80;
 const { BITRIX_WEBHOOK } = process.env;
 
 // Constantes para os códigos de status
-const STATUS_SUCESSO = '2872'; // Código Bitrix para: Telefone Padronizado (Correto)
-const STATUS_FALHA = '3026';   // Código Bitrix para: Erro na Padronização (Inválido)
+const STATUS_SUCESSO = '2872';
+const STATUS_FALHA = '3026';  
 const CAMPO_FIXO_ID = 'UF_CRM_1761808180550'; 
 const CAMPO_TELEFONE_ID = 'UF_CRM_1761804215';
 
@@ -35,7 +35,7 @@ const padronizarTelefoneBrasil = (input) => {
         return { sucesso: false, valor: categorizarErro(num) };
     }
 
-    // Retorna número se já tiver DDI ou adiciona DDI se tiver 11 ou 12 dígitos
+
     const valor = num.startsWith(DDI) ? num : (num.length === 11 || num.length === 12 ? DDI + num : null);
 
     if (valor) {
@@ -51,13 +51,10 @@ const padronizarTelefoneBrasil = (input) => {
 const enviarParaBitrix24 = async (id, resultadoPadronizacao) => {
     if (!BITRIX_WEBHOOK) return console.error("[BITRIX] CRÍTICO: Webhook não configurado.");
     
-    // 1. Define o valor do Telefone: Se sucesso, usa o número; se falha, usa string vazia.
     const valorTelefone = resultadoPadronizacao.sucesso ? resultadoPadronizacao.valor : '';
     
-    // 2. Define o valor do Status Fixo: 2872 para sucesso, 3026 para falha.
     const valorFixo = resultadoPadronizacao.sucesso ? STATUS_SUCESSO : STATUS_FALHA;
-    
-    // O valor de log para visualização
+
     const logTelefone = resultadoPadronizacao.sucesso ? valorTelefone : `FALHA (${resultadoPadronizacao.valor})`;
 
 
@@ -93,15 +90,13 @@ app.get('/', async (req, res) => {
     }
 
     const resultado = padronizarTelefoneBrasil(tel);
-    
-    // Envia o resultado para Bitrix. A função 'enviarParaBitrix24' decide os códigos.
+
     await enviarParaBitrix24(leadId, resultado);
 
-    // Resposta de sucesso para o cliente que chamou o webhook (Bitrix)
     res.json({ 
         processamento_sucesso: resultado.sucesso, 
         lead_id_atualizado: leadId, 
-        valor_padronizado_log: resultado.valor, // Valor no log (padronizado ou mensagem de erro)
+        valor_padronizado_log: resultado.valor,
         status_fixo_enviado: resultado.sucesso ? STATUS_SUCESSO : STATUS_FALHA
     });
     console.log("[REQ] Finalizada (200).");
