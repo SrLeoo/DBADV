@@ -109,9 +109,9 @@ app.listen(PORT, () => console.log(`Servidor Webhook rodando na porta ${PORT} (v
 app.use(express.json()); // Permite ler o JSON que o Bitrix manda
 
 // Essa é a Rota (o endereço) que você vai colocar lá no Bitrix
-app.post('/webhook-bitrix', async (req, res) => {
+app.post('https://dbadv.bitrix24.com.br/rest/8666/il00ukg3rwnmz01h/', async (req, res) => {
     try {
-        console.log(" Opa! O Bitrix tocou a campainha!");
+        console.log(" Chamada do BITRIX!");
         
         // 1. Pegar o telefone que veio do Bitrix (O formato depende do Bitrix)
         // Vamos supor que ele mande algo como: { "phone": "11999998888", "company": "Cliente X" }
