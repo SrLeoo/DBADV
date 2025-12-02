@@ -1,15 +1,26 @@
 {
   "name": "vscodigos",
   "version": "1.0.0",
-  "description": "",
+  "description": "Descricao\r ---------\r Este projeto consiste em uma ferramenta de automacao que processa uma lista \r de numeros de telefone, aplica a padronizacao brasileira (DDI 55) e registra \r as metricas de processamento (sucessos, falhas e total) em um banco de dados MySQL.",
+  "homepage": "https://github.com/SrLeoo/DBADV#readme",
+  "bugs": {
+    "url": "https://github.com/SrLeoo/DBADV/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SrLeoo/DBADV.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "axios": "^1.13.2",
-    "express": "^5.2.1"
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "mysql2": "^3.15.3"
   }
 }

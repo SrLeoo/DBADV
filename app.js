@@ -1,4 +1,5 @@
 const express = require('express');
+const { salvarLog } = require('./conexao.js');
 const axios = require('axios');
 const app = express();
 
@@ -103,3 +104,45 @@ app.get('/', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Servidor Webhook rodando na porta ${PORT} (vFinal-Status).`));
+
+// --- NOVA IMPLEMENTAÇÃO
+app.use(express.json()); // Permite ler o JSON que o Bitrix manda
+
+// Essa é a Rota (o endereço) que você vai colocar lá no Bitrix
+app.post('/webhook-bitrix', async (req, res) => {
+    try {
+        console.log(" Opa! O Bitrix tocou a campainha!");
+        
+        // 1. Pegar o telefone que veio do Bitrix (O formato depende do Bitrix)
+        // Vamos supor que ele mande algo como: { "phone": "11999998888", "company": "Cliente X" }
+        const telefoneRecebido = req.body.phone; 
+        const nomeEmpresa = req.body.company || "Bitrix Indefinido";
+
+        // 2. Usar sua lógica antiga
+        const resultado = padronizarTelefoneBrasil(telefoneRecebido);
+        
+        // 3. Regra de Validação
+        const ehValido = resultado && resultado.startsWith('55') && resultado.length >= 12;
+
+        // 4. Salvar no Banco (Unitário)
+        // Aqui salvamos 1 requisição por vez
+        const sucesso = ehValido ? 1 : 0;
+        const falha = ehValido ? 0 : 1;
+        
+        await salvarLog(nomeEmpresa, "Webhook Bitrix", sucesso, falha, 1);
+
+        console.log(` Processado: ${telefoneRecebido} -> ${resultado}`);
+        
+        // 5. Responder pro Bitrix que deu tudo certo
+        res.status(200).send('Recebido com sucesso!');
+
+    } catch (erro) {
+        console.error("Erro no processamento:", erro);
+        res.status(500).send('Erro interno');
+    }
+});
+
+// Coloca o servidor pra rodar na porta 3000
+app.listen(3000, () => {
+    console.log('Servidor rodando! Esperando o Bitrix chamar...');
+});
