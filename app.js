@@ -30,29 +30,26 @@ function padronizarTelefoneBrasil(input) {
     const inputOriginal = input || ''; 
     const DDI = '55';
 
-    // 1. Limpa e isola o primeiro número da string (se houver vírgula, usa apenas o primeiro)
-    const numLimpo = inputOriginal.split(',')[0].trim().replace(/\D/g, '');
+    // 1. OTIMIZAÇÃO DE LIMPEZA: Isola o primeiro número (quebra por vírgula)
+    // e remove todos os não-dígitos APENAS dessa primeira parte.
+    const numBruto = inputOriginal.split(',')[0] || '';
+    const numLimpo = numBruto.trim().replace(/\D/g, '');
 
-    // 2. VERIFICAÇÃO REFORÇADA PARA INPUT VAZIO/NULO (lógica principal está nas rotas)
+    // 2. VERIFICAÇÃO REFORÇADA PARA INPUT VAZIO/NULO
     if (numLimpo.length === 0) {
         const errorMsg = "Entrada vazia ou sem dígitos.";
         return { sucesso: false, valor: errorMsg, statusDetail: errorMsg, inputOriginal };
     }
 
     // 3. Verifica o comprimento do número limpo
-    // AGORA ACEITA 11, 12 ou 13 dígitos:
-    // 11 dígitos: DDD(2) + NÚMERO(9) -> Deve adicionar 55. (Seu caso)
-    // 12 dígitos: DDI(2) + DDD(2) + NÚMERO(8)
-    // 13 dígitos: DDI(2) + DDD(2) + NÚMERO(9)
+    // Aceita 11 (DDD+9 digitos), 12 (DDI+DDD+8 digitos) ou 13 (DDI+DDD+9 digitos)
     if (![11, 12, 13].includes(numLimpo.length)) {
         const erroMsg = categorizarErro(numLimpo);
-        // Retorna o input original e a mensagem de erro detalhada
         return { sucesso: false, valor: erroMsg, statusDetail: erroMsg, inputOriginal };
     }
 
     // 4. Adiciona DDI se necessário (Padronização)
-    // Se o número tiver 11 dígitos, ele não começará com '55', então o DDI será adicionado,
-    // resultando no formato de 13 dígitos esperado.
+    // Se o número tiver 11 dígitos, ele não começará com '55', então o DDI será adicionado.
     const valorPadronizado = numLimpo.startsWith(DDI)
         ? numLimpo
         : DDI + numLimpo;
@@ -67,7 +64,7 @@ async function atualizarBitrix(leadId, resultado) {
         return;
     }
 
-    // Determina o valor do status
+    // Determina o valor do status (STRING simples, conforme última confirmação)
     const statusValue = resultado.sucesso ? STATUS_BITRIX_SUCESSO : STATUS_BITRIX_FALHA;
 
     const payload = {
@@ -75,7 +72,7 @@ async function atualizarBitrix(leadId, resultado) {
         fields: {
             // Se falha, limpa o campo do telefone e seta o status de falha
             [CAMPO_TELEFONE_ID]: resultado.sucesso ? resultado.valor : '', 
-            // Enviar o status como STRING simples, conforme solicitado
+            // Enviar o status como STRING simples
             [CAMPO_FIXO_ID]: statusValue 
         }
     };
