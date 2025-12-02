@@ -25,28 +25,32 @@ function categorizarErro(num) {
 }
 
 function padronizarTelefoneBrasil(input) {
-    // Adicionamos o 'inputOriginal' ao objeto de retorno para rastreamento
-    const inputOriginal = input; 
-
-    if (!input) return { sucesso: false, valor: "Input vazio", statusDetail: "Input vazio", inputOriginal: "" };
-
-    const num = input.split(',')[0].trim().replace(/\D/g, '');
+    // VARIÁVEL CHAVE: Armazena o input original (bruto) antes de qualquer manipulação,
+    // garantindo que o log mostre exatamente o que foi recebido.
+    const inputOriginal = input || ''; 
     const DDI = '55';
 
-    // Aceita 11, 12 ou 13 dígitos.
-    if (![11, 12, 13].includes(num.length)) {
-        const erroMsg = categorizarErro(num);
+    // 1. Limpa e isola o primeiro número da string (se houver vírgula, usa apenas o primeiro)
+    const numLimpo = inputOriginal.split(',')[0].trim().replace(/\D/g, '');
+
+    if (!inputOriginal || numLimpo.length === 0) 
+        return { sucesso: false, valor: "Input vazio", statusDetail: "Input vazio", inputOriginal };
+
+    // 2. Verifica o comprimento do número limpo
+    // Aceita 11, 12 ou 13 dígitos (DDD + 9/8 dígitos ou DDI + DDD + 9/8 dígitos).
+    if (![11, 12, 13].includes(numLimpo.length)) {
+        const erroMsg = categorizarErro(numLimpo);
         // Retorna o input original e a mensagem de erro detalhada
         return { sucesso: false, valor: erroMsg, statusDetail: erroMsg, inputOriginal };
     }
 
-    // Adiciona DDI se necessário
-    const valor = num.startsWith(DDI)
-        ? num
-        : DDI + num;
+    // 3. Adiciona DDI se necessário (Padronização)
+    const valorPadronizado = numLimpo.startsWith(DDI)
+        ? numLimpo
+        : DDI + numLimpo;
 
     // Retorna o input original e o valor padronizado
-    return { sucesso: true, valor, statusDetail: "Telefone Padronizado", inputOriginal };
+    return { sucesso: true, valor: valorPadronizado, statusDetail: "Telefone Padronizado", inputOriginal };
 }
 
 async function atualizarBitrix(leadId, resultado) {
@@ -90,11 +94,11 @@ async function registrarLogAuditoria(empresa, aplicacao, resultadoPadronizacao, 
     // Usa 'SUCESS' ou 'FAIL' conforme a nova estrutura da tabela
     const status = resultadoPadronizacao.sucesso ? "SUCESS" : "FAIL"; 
     
-    // Constrói o novo statusDetail
+    // Constrói o novo statusDetail: Input Bruto + Resultado/Falha
     let detailMessage = `Input: ${resultadoPadronizacao.inputOriginal} | `;
     
     if (resultadoPadronizacao.sucesso) {
-        detailMessage += `Resultado: ${resultadoPadronizacao.valor}`;
+        detailMessage += `Resultado Padronizado: ${resultadoPadronizacao.valor}`;
     } else {
         detailMessage += `Falha: ${resultadoPadronizacao.statusDetail}`;
     }
