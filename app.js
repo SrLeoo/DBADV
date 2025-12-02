@@ -19,7 +19,7 @@ const EMPRESA_FIXA = "Dutra Bitencourt Advocacia"; // Cliente mockado
 // --- Funções de Lógica ---
 
 function categorizarErro(num) {
-    if (num.length < 11) return "Poucos caracteres (< 11)";
+    if (num.length < 12) return "Poucos caracteres (< 12). DDI (55) obrigatório."; // Ajustado para 12
     if (num.length > 13) return "Muitos caracteres (> 13)";
     return "Comprimento inválido";
 }
@@ -33,18 +33,23 @@ function padronizarTelefoneBrasil(input) {
     // 1. Limpa e isola o primeiro número da string (se houver vírgula, usa apenas o primeiro)
     const numLimpo = inputOriginal.split(',')[0].trim().replace(/\D/g, '');
 
-    if (!inputOriginal || numLimpo.length === 0) 
-        return { sucesso: false, valor: "Input vazio", statusDetail: "Input vazio", inputOriginal };
+    // 2. VERIFICAÇÃO REFORÇADA PARA INPUT VAZIO/NULO
+    if (numLimpo.length === 0) {
+        const errorMsg = "Entrada vazia ou sem dígitos.";
+        return { sucesso: false, valor: errorMsg, statusDetail: errorMsg, inputOriginal };
+    }
 
-    // 2. Verifica o comprimento do número limpo
-    // Aceita 11, 12 ou 13 dígitos (DDD + 9/8 dígitos ou DDI + DDD + 9/8 dígitos).
-    if (![11, 12, 13].includes(numLimpo.length)) {
+    // 3. Verifica o comprimento do número limpo
+    // AGORA ACEITA APENAS 12 ou 13 dígitos. Isso força a presença do DDI (55).
+    // 12 dígitos: DDI(2) + DDD(2) + NÚMERO(8)
+    // 13 dígitos: DDI(2) + DDD(2) + NÚMERO(9)
+    if (![12, 13].includes(numLimpo.length)) {
         const erroMsg = categorizarErro(numLimpo);
         // Retorna o input original e a mensagem de erro detalhada
         return { sucesso: false, valor: erroMsg, statusDetail: erroMsg, inputOriginal };
     }
 
-    // 3. Adiciona DDI se necessário (Padronização)
+    // 4. Adiciona DDI se necessário (Padronização)
     const valorPadronizado = numLimpo.startsWith(DDI)
         ? numLimpo
         : DDI + numLimpo;
