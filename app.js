@@ -33,7 +33,8 @@ function padronizarTelefoneBrasil(input) {
     // 1. Limpa e isola o primeiro número da string (se houver vírgula, usa apenas o primeiro)
     const numLimpo = inputOriginal.split(',')[0].trim().replace(/\D/g, '');
 
-    // 2. VERIFICAÇÃO DE INPUT VAZIO/NULO (usada aqui como fallback, mas verificada antes nas rotas)
+    // 2. VERIFICAÇÃO REFORÇADA PARA INPUT VAZIO/NULO
+    // OBS: A verificação principal de vazio foi movida para as rotas GET/POST
     if (numLimpo.length === 0) {
         const errorMsg = "Entrada vazia ou sem dígitos.";
         return { sucesso: false, valor: errorMsg, statusDetail: errorMsg, inputOriginal };
@@ -62,8 +63,7 @@ async function atualizarBitrix(leadId, resultado) {
         return;
     }
 
-    // O Bitrix geralmente exige que campos de lista personalizados (como UF_CRM)
-    // sejam passados como um array, mesmo que contenham apenas um ID.
+    // Determina o valor do status
     const statusValue = resultado.sucesso ? STATUS_BITRIX_SUCESSO : STATUS_BITRIX_FALHA;
 
     const payload = {
@@ -71,8 +71,8 @@ async function atualizarBitrix(leadId, resultado) {
         fields: {
             // Se falha, limpa o campo do telefone e seta o status de falha
             [CAMPO_TELEFONE_ID]: resultado.sucesso ? resultado.valor : '', 
-            // AJUSTE CRÍTICO: Enviando o status como um ARRAY
-            [CAMPO_FIXO_ID]: [statusValue] 
+            // AJUSTE SOLICITADO: Enviar o status como STRING simples (não array)
+            [CAMPO_FIXO_ID]: statusValue 
         }
     };
 
@@ -157,7 +157,7 @@ app.get('/', async (req, res) => {
         return res.status(400).send("Erro: leadId faltando");
     }
     
-    // Lógica 2 (NOVA LÓGICA EXPLÍCITA): Se o telefone estiver faltando ou vazio.
+    // Lógica 2 (FALHA IMEDIATA): Se o telefone estiver faltando ou vazio.
     if (!tel || tel.trim() === '') {
         const resultadoErro = { sucesso: false, valor: "Telefone de entrada vazio/nulo", statusDetail: "Telefone de entrada vazio/nulo", inputOriginal: tel || '' };
         
@@ -182,8 +182,10 @@ app.get('/', async (req, res) => {
     // 1. Atualiza o Bitrix (usará sucesso ou falha do padronizador)
     await atualizarBitrix(leadId, resultado);
 
-    // 2. Log Agregado e 3. Log de Auditoria
+    // 2. Log Agregado
     await registrarLogAgregado(resultado, EMPRESA, APLICACAO);
+    
+    // 3. Log de Auditoria
     await registrarLogAuditoria(EMPRESA, APLICACAO, resultado, leadId);
 
     res.json({
@@ -207,8 +209,8 @@ app.post('/webhook-bitrix', async (req, res) => {
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultadoErro, leadId);
         return res.status(400).send('Erro: Lead ID faltando');
     }
-    
-    // Lógica 2 (NOVA LÓGICA EXPLÍCITA): Se o telefone estiver vazio.
+
+    // Lógica 2 (FALHA IMEDIATA): Se o telefone estiver vazio.
     if (telefone.trim() === '') {
         const resultadoErro = { sucesso: false, valor: "Telefone de entrada vazio/nulo", statusDetail: "Telefone de entrada vazio/nulo", inputOriginal: telefone };
         
