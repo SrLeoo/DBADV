@@ -94,12 +94,14 @@ async function registrarLogAuditoria(empresa, aplicacao, resultadoPadronizacao, 
     // Usa 'SUCESS' ou 'FAIL' conforme a nova estrutura da tabela
     const status = resultadoPadronizacao.sucesso ? "SUCESS" : "FAIL"; 
     
-    // Constrói o novo statusDetail: Input Bruto + Resultado/Falha
+    // Constrói o novo statusDetail: Input Bruto | Resultado/Falha
     let detailMessage = `Input: ${resultadoPadronizacao.inputOriginal} | `;
     
     if (resultadoPadronizacao.sucesso) {
-        detailMessage += `Resultado Padronizado: ${resultadoPadronizacao.valor}`;
+        // Formato para Sucesso: Input (parâmetro) | Resultado (telefone tratado)
+        detailMessage += `Resultado: ${resultadoPadronizacao.valor}`;
     } else {
+        // Formato para Falha: Input (parâmetro) | Falha: [Motivo]
         detailMessage += `Falha: ${resultadoPadronizacao.statusDetail}`;
     }
 
@@ -109,7 +111,7 @@ async function registrarLogAuditoria(empresa, aplicacao, resultadoPadronizacao, 
             empresa,
             aplicacao, 
             status, 
-            detailMessage, // Usa a mensagem detalhada
+            detailMessage, // Usa a mensagem detalhada formatada
             leadId
         );
     } catch (err) {
