@@ -136,6 +136,7 @@ app.get('/', async (req, res) => {
         // Resultado de erro específico para falta de parâmetros
         const resultadoErro = { sucesso: false, valor: "Parâmetros faltando", statusDetail: "Parâmetros faltando (tel ou leadId)", inputOriginal: tel || '' };
         
+        // Neste caso, se leadId estiver faltando, não podemos atualizar o Bitrix.
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultadoErro, leadId || 'N/A');
         
@@ -170,10 +171,15 @@ app.post('/webhook-bitrix', async (req, res) => {
     try {
         const resultado = padronizarTelefoneBrasil(telefone);
 
-        // 1. Log Agregado
+        // 1. Atualiza o Bitrix (Adicionado: Estava faltando na rota POST)
+        if (leadId && leadId !== 'N/A') {
+             await atualizarBitrix(leadId, resultado);
+        }
+
+        // 2. Log Agregado
         await registrarLogAgregado(resultado, EMPRESA, APLICACAO);
         
-        // 2. Log de Auditoria
+        // 3. Log de Auditoria
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultado, leadId);
 
         res.status(200).send('OK');
@@ -181,10 +187,15 @@ app.post('/webhook-bitrix', async (req, res) => {
         // Resultado de erro específico para erro interno no servidor
         const resultadoErro = { sucesso: false, valor: `Erro interno: ${erro.message}`, statusDetail: "Erro interno do servidor", inputOriginal: telefone };
 
-        // 1. Log Agregado de Falha
+        // 1. Atualiza o Bitrix (Adicionado: Atualiza para falha em caso de erro interno)
+        if (leadId && leadId !== 'N/A') {
+             await atualizarBitrix(leadId, resultadoErro);
+        }
+        
+        // 2. Log Agregado de Falha
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
 
-        // 2. Log de Auditoria de Falha
+        // 3. Log de Auditoria de Falha
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultadoErro, leadId);
         
         console.error("[WEBHOOK] Erro:", erro.message);
