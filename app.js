@@ -5,7 +5,11 @@ const app = express();
 const PORT = process.env.PORT || 80;
 const { BITRIX_WEBHOOK } = process.env;
 
-// Função utilitária compacta para erros
+// Define o valor fixo a ser enviado para o segundo campo
+const CAMPO_FIXO_VALOR = '3026';
+const CAMPO_FIXO_ID = 'UF_CRM_1761808180550'; // Novo ID de campo fixo
+
+// Função utilitária compacta para categorizar erros de comprimento
 const categorizarErro = (num) => 
     num.length < 11 ? "Poucos caracteres (< 11)." :
     num.length >= 14 ? "Muitos caracteres (> 13)." :
@@ -21,7 +25,8 @@ const padronizarTelefoneBrasil = (input) => {
 
     // Validação de comprimento: aceita 13 dígitos OU (11 dígitos se não começar com 55)
     if (num.length !== 13 && !(num.length === 11 && !num.startsWith(DDI))) {
-        console.log(`[PADRONIZADOR] Falha: ${num.length} dígitos.`);
+        console.log(`[PADRONIZADOR] Falha: ${num.length} dígitos. Retornando erro para o log.`);
+        // Retorna a mensagem de erro para o log, mas o valor real enviado para o Bitrix será ''
         return { sucesso: false, valor: categorizarErro(num) };
     }
 
@@ -38,15 +43,27 @@ const padronizarTelefoneBrasil = (input) => {
 };
 
 // Integração com Bitrix24
-const enviarParaBitrix24 = async (id, valor) => {
+const enviarParaBitrix24 = async (id, resultadoPadronizacao) => {
     if (!BITRIX_WEBHOOK) return console.error("[BITRIX] CRÍTICO: Webhook não configurado.");
+    
+    // Se a padronização falhou, enviamos uma string vazia para o Bitrix no campo de telefone.
+    // Isso evita que o Bitrix receba texto em um campo numérico/telefone.
+    const valorTelefone = resultadoPadronizacao.sucesso ? resultadoPadronizacao.valor : '';
+    
+    // O valor de log é o valor padronizado ou a mensagem de erro
+    const logValor = resultadoPadronizacao.sucesso ? valorTelefone : `FALHA (${resultadoPadronizacao.valor})`;
+
 
     const payload = { 
         id, 
-        fields: { 'UF_CRM_1761804215': valor, 'UF_CRM_1761808180550': '2872' } 
+        fields: { 
+            'UF_CRM_1761804215': valorTelefone, // Enviado como '' em caso de falha
+            [CAMPO_FIXO_ID]: CAMPO_FIXO_VALOR // Sempre 3026
+        } 
     };
 
-    console.log(`[BITRIX] Atualizando Lead ${id}. Payload: ${JSON.stringify(payload)}`);
+    console.log(`[BITRIX] Atualizando Lead ${id}. Telefone: ${logValor} | Fixo: ${CAMPO_FIXO_VALOR}`);
+    console.log(`[BITRIX] Payload enviado: ${JSON.stringify(payload)}`);
 
     try {
         const { data, status } = await axios.post(`${BITRIX_WEBHOOK}crm.lead.update`, payload);
@@ -68,13 +85,18 @@ app.get('/', async (req, res) => {
         return res.status(400).send("<h1>Erro: Parâmetros faltando.</h1>");
     }
 
-    const { sucesso, valor } = padronizarTelefoneBrasil(tel);
+    const resultado = padronizarTelefoneBrasil(tel);
     
-    // Envia para o Bitrix de forma assíncrona (await garante a ordem)
-    await enviarParaBitrix24(leadId, valor);
+    await enviarParaBitrix24(leadId, resultado);
 
-    res.json({ sucesso, valor, leadId, fixo: '2872' });
+
+    res.json({ 
+        processamento_sucesso: resultado.sucesso, 
+        lead_id_atualizado: leadId, 
+        valor_padronizado_log: resultado.valor,
+        campo_fixo_atualizado: `${CAMPO_FIXO_ID} = ${CAMPO_FIXO_VALOR}`
+    });
     console.log("[REQ] Finalizada (200).");
 });
 
-app.listen(PORT, () => console.log(`Servidor Webhook rodando na porta ${PORT} (vCompacta).`));
+app.listen(PORT, () => console.log(`Servidor Webhook rodando na porta ${PORT} (vCompacta-3026).`));
