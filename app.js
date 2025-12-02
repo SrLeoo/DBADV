@@ -201,8 +201,13 @@ app.post('/webhook-bitrix', async (req, res) => {
     const APLICACAO = "Webhook Bitrix";
     const EMPRESA = EMPRESA_FIXA;
     const leadId = req.body.data && req.body.data.FIELDS ? req.body.data.FIELDS.ID : 'N/A';
-    const telefone = req.body.phone || req.body.telefone || "";
-
+    
+    // OTIMIZAÇÃO: Tenta pegar o telefone como string ou o primeiro elemento de um array
+    let telefone = req.body.phone || req.body.telefone || '';
+    if (Array.isArray(telefone) && telefone.length > 0) {
+        telefone = telefone[0]; // Pega apenas o primeiro item se for um array
+    }
+    
     // Lógica 1: Se leadId está faltando (impossível atualizar o Bitrix)
     if (leadId === 'N/A') {
         const resultadoErro = { sucesso: false, valor: "Lead ID faltando no payload", statusDetail: "Lead ID faltando", inputOriginal: telefone };
