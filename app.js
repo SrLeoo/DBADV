@@ -19,36 +19,40 @@ const EMPRESA_FIXA = "Dutra Bitencourt Advocacia"; // Cliente mockado
 // --- Funções de Lógica ---
 
 function categorizarErro(num) {
-    if (num.length < 12) return "Poucos caracteres (< 12). DDI (55) obrigatório."; // Ajustado para 12
+    // A verificação de < 11 é suficiente, pois 11, 12 e 13 agora são aceitos
+    if (num.length < 11) return "Poucos caracteres. DDD (2) + Número (9) obrigatório, ou DDI + DDD + Número.";
     if (num.length > 13) return "Muitos caracteres (> 13)";
     return "Comprimento inválido";
 }
 
 function padronizarTelefoneBrasil(input) {
-    // VARIÁVEL CHAVE: Armazena o input original (bruto) antes de qualquer manipulação,
-    // garantindo que o log mostre exatamente o que foi recebido.
+    // VARIÁVEL CHAVE: Armazena o input original (bruto)
     const inputOriginal = input || ''; 
     const DDI = '55';
 
     // 1. Limpa e isola o primeiro número da string (se houver vírgula, usa apenas o primeiro)
     const numLimpo = inputOriginal.split(',')[0].trim().replace(/\D/g, '');
 
-    // 2. VERIFICAÇÃO REFORÇADA PARA INPUT VAZIO/NULO
-    // OBS: A verificação principal de vazio foi movida para as rotas GET/POST
+    // 2. VERIFICAÇÃO REFORÇADA PARA INPUT VAZIO/NULO (lógica principal está nas rotas)
     if (numLimpo.length === 0) {
         const errorMsg = "Entrada vazia ou sem dígitos.";
         return { sucesso: false, valor: errorMsg, statusDetail: errorMsg, inputOriginal };
     }
 
     // 3. Verifica o comprimento do número limpo
-    // AGORA ACEITA APENAS 12 ou 13 dígitos. Isso força a presença do DDI (55).
-    if (![12, 13].includes(numLimpo.length)) {
+    // AGORA ACEITA 11, 12 ou 13 dígitos:
+    // 11 dígitos: DDD(2) + NÚMERO(9) -> Deve adicionar 55. (Seu caso)
+    // 12 dígitos: DDI(2) + DDD(2) + NÚMERO(8)
+    // 13 dígitos: DDI(2) + DDD(2) + NÚMERO(9)
+    if (![11, 12, 13].includes(numLimpo.length)) {
         const erroMsg = categorizarErro(numLimpo);
         // Retorna o input original e a mensagem de erro detalhada
         return { sucesso: false, valor: erroMsg, statusDetail: erroMsg, inputOriginal };
     }
 
     // 4. Adiciona DDI se necessário (Padronização)
+    // Se o número tiver 11 dígitos, ele não começará com '55', então o DDI será adicionado,
+    // resultando no formato de 13 dígitos esperado.
     const valorPadronizado = numLimpo.startsWith(DDI)
         ? numLimpo
         : DDI + numLimpo;
@@ -71,7 +75,7 @@ async function atualizarBitrix(leadId, resultado) {
         fields: {
             // Se falha, limpa o campo do telefone e seta o status de falha
             [CAMPO_TELEFONE_ID]: resultado.sucesso ? resultado.valor : '', 
-            // AJUSTE SOLICITADO: Enviar o status como STRING simples (não array)
+            // Enviar o status como STRING simples, conforme solicitado
             [CAMPO_FIXO_ID]: statusValue 
         }
     };
