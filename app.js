@@ -75,14 +75,14 @@ const enviarParaBitrix24 = async (id, resultadoPadronizacao) => {
 // Ex: http://seusite.com/?telefoneInput=11999998888&leadId=100
 app.get('/', async (req, res) => {
     const { telefoneInput: tel, leadId } = req.query;
-    const empresa = "Bitrix Automation"; // Nome fixo ou pode tentar pegar de outro lugar
+    const empresa = "Dutra Bitencourt Advocacia"; // Nome fixo ou pode tentar pegar de outro lugar
 
     console.log(`\n[REQ GET] ${new Date().toISOString()} | Tel: ${tel} | Lead: ${leadId}`);
 
     if (!tel || !leadId) {
         console.error("[ERRO] Parâmetros faltando.");
         // Loga falha técnica (sem dados)
-        await salvarLog(empresa, "App Padronizador", 0, 1, 1);
+        await salvarLog(empresa, "Correção de telefone", 0, 1, 1);
         return res.status(400).send("Erro: Parâmetros faltando.");
     }
 
@@ -95,7 +95,7 @@ app.get('/', async (req, res) => {
     // 3. SALVA NO BANCO (A parte que faltava!) 💾
     const sucesso = resultado.sucesso ? 1 : 0;
     const falha = resultado.sucesso ? 0 : 1;
-    await salvarLog(empresa, "App Padronizador", sucesso, falha, 1);
+    await salvarLog(empresa, "Correção de telefone", sucesso, falha, 1);
 
     // 4. Responde
     res.json({ 
