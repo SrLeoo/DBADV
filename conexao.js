@@ -2,12 +2,15 @@ require('dotenv').config();
 const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
-    // ATENÇÃO: Sem aspas ('') aqui! Tem que ficar colorido no VS Code.
     host: process.env.NAME_HOST, 
     user: process.env.USER,
     password: process.env.PASS,
     database: 'system_logs', 
-    port: 7102 
+    port: 7102,
+    // [NOVO] Configuração de SSL Obrigatória para Square Cloud
+    ssl: {
+        rejectUnauthorized: false 
+    }
 });
 
 async function salvarLog(company, app, sucesso, falha, total) {
