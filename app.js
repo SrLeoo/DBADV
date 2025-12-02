@@ -25,23 +25,28 @@ function categorizarErro(num) {
 }
 
 function padronizarTelefoneBrasil(input) {
-    if (!input) return { sucesso: false, valor: "Input vazio", statusDetail: "Input vazio" };
+    // Adicionamos o 'inputOriginal' ao objeto de retorno para rastreamento
+    const inputOriginal = input; 
+
+    if (!input) return { sucesso: false, valor: "Input vazio", statusDetail: "Input vazio", inputOriginal: "" };
 
     const num = input.split(',')[0].trim().replace(/\D/g, '');
     const DDI = '55';
 
     // Aceita 11, 12 ou 13 dígitos.
-    if (![11, 12, 13].includes(num.length))
-        // Adicionando statusDetail na falha
-        return { sucesso: false, valor: categorizarErro(num), statusDetail: categorizarErro(num) };
+    if (![11, 12, 13].includes(num.length)) {
+        const erroMsg = categorizarErro(num);
+        // Retorna o input original e a mensagem de erro detalhada
+        return { sucesso: false, valor: erroMsg, statusDetail: erroMsg, inputOriginal };
+    }
 
     // Adiciona DDI se necessário
     const valor = num.startsWith(DDI)
         ? num
         : DDI + num;
 
-    // Adicionando statusDetail no sucesso
-    return { sucesso: true, valor, statusDetail: "Telefone Padronizado" };
+    // Retorna o input original e o valor padronizado
+    return { sucesso: true, valor, statusDetail: "Telefone Padronizado", inputOriginal };
 }
 
 async function atualizarBitrix(leadId, resultado) {
@@ -84,16 +89,23 @@ async function registrarLogAgregado(resultado, empresa, aplicacao) {
 async function registrarLogAuditoria(empresa, aplicacao, resultadoPadronizacao, leadId) {
     // Usa 'SUCESS' ou 'FAIL' conforme a nova estrutura da tabela
     const status = resultadoPadronizacao.sucesso ? "SUCESS" : "FAIL"; 
-    // Captura o statusDetail do resultado padronizado (incluído na função padronizarTelefoneBrasil)
-    const statusDetail = resultadoPadronizacao.statusDetail || "Erro Desconhecido"; 
     
+    // Constrói o novo statusDetail
+    let detailMessage = `Input: ${resultadoPadronizacao.inputOriginal} | `;
+    
+    if (resultadoPadronizacao.sucesso) {
+        detailMessage += `Resultado: ${resultadoPadronizacao.valor}`;
+    } else {
+        detailMessage += `Falha: ${resultadoPadronizacao.statusDetail}`;
+    }
+
     try {
         // Chama a nova função salvarAuditoria
         await salvarAuditoria(
             empresa,
             aplicacao, 
             status, 
-            statusDetail, 
+            detailMessage, // Usa a mensagem detalhada
             leadId
         );
     } catch (err) {
@@ -111,7 +123,7 @@ app.get('/', async (req, res) => {
 
     if (!tel || !leadId) {
         // Resultado de erro específico para falta de parâmetros
-        const resultadoErro = { sucesso: false, valor: "Parâmetros faltando", statusDetail: "Parâmetros faltando (tel ou leadId)" };
+        const resultadoErro = { sucesso: false, valor: "Parâmetros faltando", statusDetail: "Parâmetros faltando (tel ou leadId)", inputOriginal: tel || '' };
         
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultadoErro, leadId || 'N/A');
@@ -156,7 +168,7 @@ app.post('/webhook-bitrix', async (req, res) => {
         res.status(200).send('OK');
     } catch (erro) {
         // Resultado de erro específico para erro interno no servidor
-        const resultadoErro = { sucesso: false, valor: `Erro interno: ${erro.message}`, statusDetail: "Erro interno do servidor" };
+        const resultadoErro = { sucesso: false, valor: `Erro interno: ${erro.message}`, statusDetail: "Erro interno do servidor", inputOriginal: telefone };
 
         // 1. Log Agregado de Falha
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
