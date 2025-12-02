@@ -1,8 +1,6 @@
 require('dotenv').config(); 
 const mysql = require('mysql2/promise');
 
-// Certifique-se de que a porta 7102 está correta e que você configurou 
-// o index UNIQUE (company, aplication) na tabela log_requests.
 const pool = mysql.createPool({
     host: process.env.NAME_HOST, 
     user: process.env.USER,
@@ -16,7 +14,7 @@ const pool = mysql.createPool({
 });
 
 /**
- * Salva ou atualiza os logs de requisição de forma agregada.
+ * Salva ou atualiza os logs de requisição de forma agregada (Tabela log_requests).
  * Se a combinação (company, app) já existe, ele soma os contadores.
  */
 async function salvarLog(company, app, sucesso, falha, total) {
@@ -32,12 +30,34 @@ async function salvarLog(company, app, sucesso, falha, total) {
                 init_date = NOW()
         `;
         
-        // A função VALUES(coluna) na parte de UPDATE se refere ao valor que está sendo inserido (os parâmetros)
         await pool.execute(query, [company, app, sucesso, falha, total]);
         console.log(`[DB] Log agregado na nuvem. Agregação: ${company}/${app}`);
     } catch (error) {
-        console.error("[DB] Erro ao salvar log (Verifique o índice UNIQUE):", error.message);
+        console.error("[DB] Erro ao salvar log agregado (Verifique o índice UNIQUE):", error.message);
     }
 }
 
-module.exports = { salvarLog };
+/**
+ * Registra o log de auditoria individual na tabela audit_log_requests.
+ * Usa os status 'SUCESS' ou 'FAIL'.
+ */
+async function salvarAuditoria(company, aplication, status, statusDetail, leadId) {
+    try {
+        // Query de INSERT para a nova tabela audit_log_requests, sem a coluna api_response
+        const query = `
+            INSERT INTO audit_log_requests 
+            (company, aplication, status, lead_id, status_detail, date_request)
+            VALUES (?, ?, ?, ?, ?, NOW())
+        `;
+        
+        // Garante que o leadId é um número inteiro ou NULL para evitar erros no banco de dados
+        const finalLeadId = leadId && leadId !== '' ? parseInt(leadId, 10) : null;
+        
+        await pool.execute(query, [company, aplication, status, finalLeadId, statusDetail]);
+        console.log(`[DB] Log de Auditoria salvo: ${company}/${aplication}/${status}`);
+    } catch (error) {
+        console.error("[DB] Erro ao salvar log de auditoria (audit_log_requests):", error.message);
+    }
+}
+
+module.exports = { salvarLog, salvarAuditoria };
