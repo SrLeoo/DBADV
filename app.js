@@ -25,16 +25,18 @@ const padronizarTelefoneBrasil = (input) => {
     
     console.log(`[PADRONIZADOR] Analisando: ${num}`);
 
-    // Validação de comprimento: aceita 13 dígitos OU (11 dígitos se não começar com 55)
-    // 13 dígitos (DDI+DDD+9+8dígitos) é o formato padrão esperado.
-    if (num.length !== 13 && !(num.length === 11 && !num.startsWith(DDI))) {
+    // Validação de comprimento: aceita 13, 12 ou 11 dígitos.
+    // 13: (DDI+DDD+9+8) - Móvel completo
+    // 12: (DDI+DDD+8)   - Fixo completo (NOVA REGRA)
+    // 11: (DDD+9+8)     - Móvel sem DDI
+    if (num.length !== 13 && num.length !== 12 && !(num.length === 11 && !num.startsWith(DDI))) {
         console.log(`[PADRONIZADOR] Falha: ${num.length} dígitos. Retornando erro para o log.`);
         // Retorna a mensagem de erro
         return { sucesso: false, valor: categorizarErro(num) };
     }
 
-    // Retorna número se já tiver DDI ou adiciona DDI se tiver 11 dígitos
-    const valor = num.startsWith(DDI) ? num : (num.length === 11 ? DDI + num : null);
+    // Retorna número se já tiver DDI ou adiciona DDI se tiver 11 ou 12 dígitos
+    const valor = num.startsWith(DDI) ? num : (num.length === 11 || num.length === 12 ? DDI + num : null);
 
     if (valor) {
         console.log(`[PADRONIZADOR] Sucesso: ${valor}`);
