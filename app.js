@@ -109,7 +109,7 @@ app.listen(PORT, () => console.log(`Servidor Webhook rodando na porta ${PORT} (v
 app.use(express.json()); // Permite ler o JSON que o Bitrix manda
 
 // Essa é a Rota (o endereço) que você vai colocar lá no Bitrix
-app.post('https://dbadv.bitrix24.com.br/rest/8666/il00ukg3rwnmz01h/', async (req, res) => {
+app.post('/webhook-bitrix', async (req, res) => {
     try {
         console.log(" Chamada do BITRIX!");
         
