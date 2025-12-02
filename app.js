@@ -13,7 +13,7 @@ const { BITRIX_WEBHOOK } = process.env;
 const STATUS_BITRIX_SUCESSO = '2872'; // ID do status de sucesso no Bitrix
 const STATUS_BITRIX_FALHA = '3026';   // ID do status de falha no Bitrix
 const CAMPO_FIXO_ID = 'UF_CRM_1761808180550';
-// ID do campo customizado de telefone
+// ID do campo customizado de telefone (Confirmado como tipo Texto/String)
 const CAMPO_TELEFONE_ID = 'UF_CRM_1761804215'; 
 const EMPRESA_FIXA = "Dutra Bitencourt Advocacia"; // Cliente mockado
 
