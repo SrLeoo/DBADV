@@ -36,7 +36,7 @@ async function salvarLog(company, app, sucesso, falha, total) {
         await pool.execute(query, [company, app, sucesso, falha, total]);
         console.log(`[DB] Log agregado na nuvem. Agregação: ${company}/${app}`);
     } catch (error) {
-        console.error("❌ [DB] Erro ao salvar log (Verifique o índice UNIQUE):", error.message);
+        console.error("[DB] Erro ao salvar log (Verifique o índice UNIQUE):", error.message);
     }
 }
 
