@@ -13,25 +13,25 @@ const { BITRIX_WEBHOOK } = process.env;
 const STATUS_BITRIX_SUCESSO = '2872'; // ID do status de sucesso no Bitrix
 const STATUS_BITRIX_FALHA = '3026';   // ID do status de falha no Bitrix
 const CAMPO_FIXO_ID = 'UF_CRM_1761808180550';
-const CAMPO_TELEFONE_ID = 'UF_CRM_1761804215';
+// ATENÇÃO: Se o campo CAMPO_TELEFONE_ID for um campo de telefone nativo do Bitrix, 
+// o ID do campo deveria ser "PHONE". Como está como UF_CRM_...,  
+// presumimos que é um campo customizado do tipo string/texto.
+const CAMPO_TELEFONE_ID = 'UF_CRM_1761804215'; 
 const EMPRESA_FIXA = "Dutra Bitencourt Advocacia"; // Cliente mockado
 
 // --- Funções de Lógica ---
 
 function categorizarErro(num) {
-    // A verificação de < 11 é suficiente, pois 11, 12 e 13 agora são aceitos
     if (num.length < 11) return "Poucos caracteres. DDD (2) + Número (9) obrigatório, ou DDI + DDD + Número.";
     if (num.length > 13) return "Muitos caracteres (> 13)";
     return "Comprimento inválido";
 }
 
 function padronizarTelefoneBrasil(input) {
-    // VARIÁVEL CHAVE: Armazena o input original (bruto)
     const inputOriginal = input || ''; 
     const DDI = '55';
 
-    // 1. OTIMIZAÇÃO DE LIMPEZA: Isola o primeiro número (quebra por vírgula)
-    // e remove todos os não-dígitos APENAS dessa primeira parte.
+    // 1. OTIMIZAÇÃO DE LIMPEZA: Isola o primeiro número e remove todos os não-dígitos
     const numBruto = inputOriginal.split(',')[0] || '';
     const numLimpo = numBruto.trim().replace(/\D/g, '');
 
@@ -42,19 +42,16 @@ function padronizarTelefoneBrasil(input) {
     }
 
     // 3. Verifica o comprimento do número limpo
-    // Aceita 11 (DDD+9 digitos), 12 (DDI+DDD+8 digitos) ou 13 (DDI+DDD+9 digitos)
     if (![11, 12, 13].includes(numLimpo.length)) {
         const erroMsg = categorizarErro(numLimpo);
         return { sucesso: false, valor: erroMsg, statusDetail: erroMsg, inputOriginal };
     }
 
     // 4. Adiciona DDI se necessário (Padronização)
-    // Se o número tiver 11 dígitos, ele não começará com '55', então o DDI será adicionado.
     const valorPadronizado = numLimpo.startsWith(DDI)
         ? numLimpo
         : DDI + numLimpo;
 
-    // Retorna o input original e o valor padronizado
     return { sucesso: true, valor: valorPadronizado, statusDetail: "Telefone Padronizado", inputOriginal };
 }
 
@@ -64,34 +61,54 @@ async function atualizarBitrix(leadId, resultado) {
         return;
     }
 
-    // Determina o valor do status (STRING simples, conforme última confirmação)
+    // Determina o valor do status 
     const statusValue = resultado.sucesso ? STATUS_BITRIX_SUCESSO : STATUS_BITRIX_FALHA;
+    
+    let camposParaAtualizar = {
+        // Campo Fixo de Status (sempre atualizado)
+        [CAMPO_FIXO_ID]: statusValue 
+    };
+
+    // ** Lógica de Correção para Campos Multivalorados (Telefone) **
+    if (resultado.sucesso) {
+        // Se o resultado foi SUCESSO, atualiza o campo de telefone.
+        // O valor é encapsulado em um array de objetos, formato padrão para Bitrix API.
+        camposParaAtualizar[CAMPO_TELEFONE_ID] = [
+            { "VALUE": resultado.valor, "VALUE_TYPE": "WORK" } // 'WORK' é um VALUE_TYPE comum
+        ];
+    } else {
+        // Se FALHA, garante que o campo de telefone seja limpo ou atualizado para "" (string vazia).
+        // Se CAMPO_TELEFONE_ID for um campo string customizado, "" funciona.
+        // Se for um campo PHONE nativo que espera array, enviar null ou [] pode ser melhor, 
+        // mas vamos manter "" como string, pois é um UF_CRM.
+        camposParaAtualizar[CAMPO_TELEFONE_ID] = '';
+    }
 
     const payload = {
         id: leadId,
-        fields: {
-            // Se falha, limpa o campo do telefone e seta o status de falha
-            [CAMPO_TELEFONE_ID]: resultado.sucesso ? resultado.valor : '', 
-            // Enviar o status como STRING simples
-            [CAMPO_FIXO_ID]: statusValue 
-        }
+        fields: camposParaAtualizar
     };
 
     try {
         const { data } = await axios.post(`${BITRIX_WEBHOOK}crm.lead.update`, payload);
         
         if (!data.result) {
-            // Log detalhado de erro retornado pela API do Bitrix
             console.error("[BITRIX] Erro API: Falha ao atualizar lead. Descrição:", 
                           data.error_description, 
                           "Payload enviado:", 
                           JSON.stringify(payload));
+            // Logamos a falha de padronização, mas o Bitrix está retornando ERRO. 
+            // Para efeitos de auditoria, vamos logar este erro de Bitrix.
+             await registrarLogAuditoria(
+                EMPRESA_FIXA, // Use a constante fixa
+                "Bitrix Update Falhou", 
+                { sucesso: false, valor: data.error_description || "Erro API Desconhecido", statusDetail: "Falha na API do Bitrix", inputOriginal: resultado.inputOriginal }, 
+                leadId
+            );
         } else {
-            // Log de sucesso
             console.log(`[BITRIX SUCESSO] Lead ID ${leadId} atualizado para status: ${statusValue}`);
         }
     } catch (e) {
-        // Log detalhado de erro de rede/conexão
         console.error("[BITRIX] Erro de rede/conexão ao atualizar lead:", 
                       e.message, 
                       "Payload enviado:", 
@@ -99,42 +116,35 @@ async function atualizarBitrix(leadId, resultado) {
     }
 }
 
-// Renomeado para 'registrarLogAgregado' para diferenciar da auditoria
+// Funções de Log (inalteradas)
 async function registrarLogAgregado(resultado, empresa, aplicacao) {
     const sucesso = resultado.sucesso ? 1 : 0;
     const falha = resultado.sucesso ? 0 : 1;
 
     try {
-        // Usa a função original salvarLog para logs agregados
         await salvarLog(empresa, aplicacao, sucesso, falha, 1);
     } catch (err) {
         console.error("[LOG] Erro ao salvar log agregado:", err.message);
     }
 }
 
-// NOVA FUNÇÃO: Registra o log na tabela audit_log_requests
 async function registrarLogAuditoria(empresa, aplicacao, resultadoPadronizacao, leadId) {
-    // Usa 'SUCESS' ou 'FAIL' conforme a nova estrutura da tabela
     const status = resultadoPadronizacao.sucesso ? "SUCESS" : "FAIL"; 
     
-    // Constrói o novo statusDetail: Input Bruto | Resultado/Falha
     let detailMessage = `Input: ${resultadoPadronizacao.inputOriginal} | `;
     
     if (resultadoPadronizacao.sucesso) {
-        // Formato para Sucesso: Input (parâmetro) | Resultado (telefone tratado)
         detailMessage += `Resultado: ${resultadoPadronizacao.valor}`;
     } else {
-        // Formato para Falha: Input (parâmetro) | Falha: [Motivo]
         detailMessage += `Falha: ${resultadoPadronizacao.statusDetail}`;
     }
 
     try {
-        // Chama a nova função salvarAuditoria
         await salvarAuditoria(
             empresa,
             aplicacao, 
             status, 
-            detailMessage, // Usa a mensagem detalhada formatada
+            detailMessage, 
             leadId
         );
     } catch (err) {
@@ -142,7 +152,7 @@ async function registrarLogAuditoria(empresa, aplicacao, resultadoPadronizacao, 
     }
 }
 
-// --- ROTAS ---
+// --- ROTAS (inalteradas na lógica de extração) ---
 
 // ROTA GET (Bitrix chamando via URL)
 app.get('/', async (req, res) => {
@@ -150,7 +160,6 @@ app.get('/', async (req, res) => {
     const APLICACAO = "Correção de telefone";
     const EMPRESA = EMPRESA_FIXA;
 
-    // Lógica 1: Se leadId está faltando (impossível atualizar o Bitrix)
     if (!leadId) {
         const resultadoErro = { sucesso: false, valor: "Lead ID faltando", statusDetail: "Lead ID faltando", inputOriginal: tel || '' };
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
@@ -158,18 +167,14 @@ app.get('/', async (req, res) => {
         return res.status(400).send("Erro: leadId faltando");
     }
     
-    // Lógica 2 (FALHA IMEDIATA): Se o telefone estiver faltando ou vazio.
     if (!tel || tel.trim() === '') {
         const resultadoErro = { sucesso: false, valor: "Telefone de entrada vazio/nulo", statusDetail: "Telefone de entrada vazio/nulo", inputOriginal: tel || '' };
         
-        // 1. Atualiza o Bitrix imediatamente para FALHA (3026)
         await atualizarBitrix(leadId, resultadoErro);
         
-        // 2. Log Agregado e 3. Log de Auditoria
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultadoErro, leadId);
         
-        // Retorna 200 OK informando a falha de padronização
         return res.status(200).json({
             sucesso: resultadoErro.sucesso,
             lead: leadId,
@@ -177,16 +182,11 @@ app.get('/', async (req, res) => {
         });
     }
 
-    // Lógica 3: Processamento padrão (Telefone e LeadId presentes e telefone não vazio)
     const resultado = padronizarTelefoneBrasil(tel);
     
-    // 1. Atualiza o Bitrix (usará sucesso ou falha do padronizador)
     await atualizarBitrix(leadId, resultado);
 
-    // 2. Log Agregado
     await registrarLogAgregado(resultado, EMPRESA, APLICACAO);
-    
-    // 3. Log de Auditoria
     await registrarLogAuditoria(EMPRESA, APLICACAO, resultado, leadId);
 
     res.json({
@@ -202,13 +202,11 @@ app.post('/webhook-bitrix', async (req, res) => {
     const EMPRESA = EMPRESA_FIXA;
     const leadId = req.body.data && req.body.data.FIELDS ? req.body.data.FIELDS.ID : 'N/A';
     
-    // OTIMIZAÇÃO: Tenta pegar o telefone como string ou o primeiro elemento de um array
     let telefone = req.body.phone || req.body.telefone || '';
     if (Array.isArray(telefone) && telefone.length > 0) {
-        telefone = telefone[0]; // Pega apenas o primeiro item se for um array
+        telefone = telefone[0]; 
     }
     
-    // Lógica 1: Se leadId está faltando (impossível atualizar o Bitrix)
     if (leadId === 'N/A') {
         const resultadoErro = { sucesso: false, valor: "Lead ID faltando no payload", statusDetail: "Lead ID faltando", inputOriginal: telefone };
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
@@ -216,41 +214,31 @@ app.post('/webhook-bitrix', async (req, res) => {
         return res.status(400).send('Erro: Lead ID faltando');
     }
 
-    // Lógica 2 (FALHA IMEDIATA): Se o telefone estiver vazio.
     if (telefone.trim() === '') {
         const resultadoErro = { sucesso: false, valor: "Telefone de entrada vazio/nulo", statusDetail: "Telefone de entrada vazio/nulo", inputOriginal: telefone };
         
-        // 1. Atualiza o Bitrix imediatamente para FALHA (3026)
         await atualizarBitrix(leadId, resultadoErro);
         
-        // 2. Log Agregado e 3. Log de Auditoria
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultadoErro, leadId);
         
-        // Retorna 200 OK (Comunicação de falha de padronização bem-sucedida)
         return res.status(200).send('OK (Telefone Vazio/Falha)');
     }
 
-    // Lógica 3: Processamento padrão (Telefone e LeadId presentes e telefone não vazio)
     try {
         const resultado = padronizarTelefoneBrasil(telefone);
 
-        // 1. Atualiza o Bitrix (usará sucesso ou falha do padronizador)
         await atualizarBitrix(leadId, resultado);
 
-        // 2. Log Agregado e 3. Log de Auditoria
         await registrarLogAgregado(resultado, EMPRESA, APLICACAO);
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultado, leadId);
 
         res.status(200).send('OK');
     } catch (erro) {
-        // Bloco de erro interno (mantido)
         const resultadoErro = { sucesso: false, valor: `Erro interno: ${erro.message}`, statusDetail: "Erro interno do servidor", inputOriginal: telefone };
 
-        // 1. Atualiza o Bitrix (Em caso de erro interno, registra a falha no Bitrix)
         await atualizarBitrix(leadId, resultadoErro); 
         
-        // 2. Log Agregado de Falha e 3. Log de Auditoria de Falha
         await registrarLogAgregado(resultadoErro, EMPRESA, APLICACAO);
         await registrarLogAuditoria(EMPRESA, APLICACAO, resultadoErro, leadId);
         
